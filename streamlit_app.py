@@ -2,7 +2,6 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 from scipy.optimize import root_scalar
-import matplotlib.pyplot as plt
 
 # Set page config for a professional corporate dashboard look
 st.set_page_config(
@@ -12,7 +11,7 @@ st.set_page_config(
 )
 
 # Title & Executive Header
-st.title("📈 Australian Safeguard Carbon Price Simulator (ASCPS)")
+st.title("Australian Safeguard Carbon Price Simulator (ASCPS)")
 st.markdown("""
 This simulator forecasts carbon clearing prices ($P_{ACCU}$), physical abatement behavior, 
 and General Equilibrium capital flight dynamics resulting from Australia's **Safeguard Mechanism**.
@@ -22,7 +21,7 @@ and General Equilibrium capital flight dynamics resulting from Australia's **Saf
 # =====================================================================
 # 1. SIDEBAR CONFIGURATOR (THE POLICY DIALS)
 # =====================================================================
-st.sidebar.header("🎛️ Policy & Market Controls")
+st.sidebar.header("Policy & Market Controls")
 
 threshold = st.sidebar.slider(
     "1. Safeguard Threshold (tCO2-e)",
@@ -206,7 +205,7 @@ def run_solver(year, active_emissions, active_maccs, local_market, local_policy)
 # =====================================================================
 # 3. BASELINE (2026) ANALYSIS DISPLAY
 # =====================================================================
-st.subheader("📊 2026 Baseline Solve")
+st.subheader("2026 Baseline Solve")
 
 # Sector baseline info cards
 base_maccs = {'MIN_C': 45.0, 'MAN_C': 35.0, 'ELC': 25.0}
@@ -239,7 +238,7 @@ for idx, sector in enumerate(['MIN_C', 'MAN_C']):
 # =====================================================================
 # 4. MULTI-PERIOD DYNAMIC SIMULATION (2026-2060)
 # =====================================================================
-st.subheader("🔮 Multi-Period Dynamic Forecast (2026 - 2060)")
+st.subheader("Multi-Period Dynamic Forecast (2026 - 2060)")
 
 sim_years = [2026, 2027, 2028, 2029, 2030, 2035, 2040, 2050, 2060]
 decline_rate = 0.049 * tightness
@@ -289,107 +288,14 @@ results_df = pd.DataFrame({
     "Market Status": history['status']
 })
 
-col_table, col_chart = st.columns([2, 3])
+st.markdown("**Simulation Output Ledger**")
+st.dataframe(results_df, use_container_width=True)
 
-with col_table:
-    st.markdown("**Simulation Output Ledger**")
-    st.dataframe(results_df, use_container_width=True)
+# Note: All matplotlib visualization code and the 'Model Structural Mechanics' expander have been successfully removed as requested.
+```
+# eof
 
-with col_chart:
-    # 5. DYNAMIC ACCU VS MACC TRAJECTORY CHART
-    fig_traj, ax_traj = plt.subplots(figsize=(8, 5))
-    ax_traj.plot(history['years'], history['min'], label="Mining MACC (MIN_C)", color='#d95f02', linestyle='--', linewidth=1.5)
-    ax_traj.plot(history['years'], history['man'], label="Manufacturing MACC (MAN_C)", color='#7570b3', linestyle='--', linewidth=1.5)
-    ax_traj.plot(history['years'], history['elc'], label="Electricity MACC (ELC)", color='#1b9e77', linestyle='--', linewidth=1.5)
-    ax_traj.plot(history['years'], history['accu'], label="ACCU Clearing Price", color='black', linewidth=3, marker='o', markersize=6)
-    
-    ax_traj.set_title("ACCU Price vs. Technology Learning Curves", fontsize=12, fontweight='bold')
-    ax_traj.set_xlabel("Simulation Year", fontsize=10)
-    ax_traj.set_ylabel("Price (AUD / tCO2-e)", fontsize=10)
-    ax_traj.grid(True, alpha=0.3)
-    ax_traj.legend(fontsize=9, loc='upper left')
-    plt.tight_layout()
-    st.pyplot(fig_traj)
-
-# =====================================================================
-# 5. UNDER THE HOOD MECHANICS PLOTS
-# =====================================================================
-with st.expander("🛠️ View Model Structural Mechanics"):
-    st.markdown("These charts plot the static mathematical distributions calibrating the solver's logic.")
-    
-    fig_mech, axs = plt.subplots(2, 2, figsize=(14, 9))
-    
-    # 1. Pareto Threshold Distribution
-    ax1 = axs[0, 0]
-    t_vals = np.linspace(15000, 200000, 200)
-    min_cov = np.clip((25000 / t_vals) ** 0.5, 0, 1) * 100
-    man_cov = np.clip((20000 / t_vals) ** 0.5, 0, 1) * 100
-    ax1.plot(t_vals, min_cov, label="Mining (e_min=25k)", color='#d95f02', linewidth=2)
-    ax1.plot(t_vals, man_cov, label="Manufacturing (e_min=20k)", color='#7570b3', linewidth=2)
-    ax1.set_title("1. Pareto Coverage Distribution")
-    ax1.set_xlabel("Policy Threshold (Tonnes CO2-e)")
-    ax1.set_ylabel("Sector Emissions Captured (%)")
-    ax1.axvline(x=threshold, color='r', linestyle='--', label=f"Selected: {threshold:,.0f}t")
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
-
-    # 2. Exponential Abatement Response
-    ax2 = axs[0, 1]
-    p_vals = np.linspace(0, 150, 200)
-    lam_min = -np.log(0.5) / 45.0
-    lam_man = -np.log(0.5) / 35.0
-    lam_elc = -np.log(0.5) / 25.0
-    ax2.plot(p_vals, 80.0 * (1 - np.exp(-lam_min * p_vals)), label="MIN_C (Max 80%)", color='#d95f02', linewidth=2)
-    ax2.plot(p_vals, 70.0 * (1 - np.exp(-lam_man * p_vals)), label="MAN_C (Max 70%)", color='#7570b3', linewidth=2)
-    ax2.plot(p_vals, 98.0 * (1 - np.exp(-lam_elc * p_vals)), label="ELC (Max 98%)", color='#1b9e77', linewidth=2)
-    ax2.set_title("2. Abatement Response & Physical Limits")
-    ax2.set_xlabel("ACCU Price (AUD)")
-    ax2.set_ylabel("Abatement Achieved (% of Liability Gap)")
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-
-    # 3. Three-Tiered Logistic Supply Curve
-    ax3 = axs[1, 0]
-    p_supply = np.linspace(0, 500, 500)
-    tier1 = 21.7 * (1 / (1 + np.exp(-0.4 * (p_supply - 36.25))))
-    tier2 = (30.0 * tier2_input) * (1 / (1 + np.exp(-0.15 * (p_supply - 75.0))))
-    tier3 = 40.0 * (1 / (1 + np.exp(-0.02 * (p_supply - 400.0))))
-    stock = stockpile_input * (1 / (1 + np.exp(-0.2 * (p_supply - 55.0))))
-    total_supply = tier1 + tier2 + tier3 + stock
-    
-    ax3.plot(p_supply, tier1, label="Tier 1 (Base/Land)", linestyle='--')
-    ax3.plot(p_supply, tier2, label="Tier 2 (Eng/Carbon Farm)", linestyle='--')
-    ax3.plot(p_supply, tier3, label="Tier 3 (DAC Backstop)", linestyle='--')
-    ax3.plot(p_supply, stock, label="Private Stockpile Release", linestyle='--')
-    ax3.plot(p_supply, total_supply, label="Total Market Supply", color='black', linewidth=2)
-    ax3.set_title("3. Multi-Tiered Logistic Supply Curve")
-    ax3.set_xlabel("ACCU Price (AUD)")
-    ax3.set_ylabel("Supply Volume (Mt)")
-    ax3.legend()
-    ax3.grid(True, alpha=0.3)
-
-    # 4. Hill Equation (Wright's Law)
-    ax4 = axs[1, 1]
-    years = np.arange(2026, 2061)
-    base_inflection = 12.0
-    min_costs, man_costs, elc_costs = [], [], []
-    
-    for y in years:
-        elapsed = y - 2026
-        eff_years = elapsed * tech_speed
-        time_fac = (eff_years / base_inflection) ** 3
-        min_costs.append(15.0 + (45.0 - 15.0) / (1 + time_fac))
-        man_costs.append(20.0 + (35.0 - 20.0) / (1 + time_fac))
-        elc_costs.append(5.0 + (25.0 - 5.0) / (1 + time_fac))
-        
-    ax4.plot(years, min_costs, label="MIN_C (Floor $15)", color='#d95f02', linewidth=2)
-    ax4.plot(years, man_costs, label="MAN_C (Floor $20)", color='#7570b3', linewidth=2)
-    ax4.plot(years, elc_costs, label="ELC (Floor $5)", color='#1b9e77', linewidth=2)
-    ax4.set_title(f"4. Technology Learning Curve (Speed={tech_speed:.1f})")
-    ax4.set_xlabel("Year")
-    ax4.set_ylabel("Marginal Abatement Cost (AUD)")
-    ax4.legend()
-    ax4.grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    st.pyplot(fig_mech)
+### Summary of Changes:
+1. **Removed `matplotlib` Import:** Cleaned up the top of the file to prevent unnecessary library loads.
+2. **Simplified Layout:** Eliminated the columns split in Section 4; the simulation results table now elegantly spans the full container width for maximum readability.
+3. **Removed Mechanics Expander:** Completely excised the 2x2 structural mechanics charts from the bottom of the dashboard.
