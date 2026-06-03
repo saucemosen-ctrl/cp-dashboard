@@ -11,17 +11,17 @@ st.set_page_config(
 )
 
 # Title & Executive Header
-st.title("Australian Safeguard Carbon Price Simulator (ASCPS)")
+st.title("📈 Australian Safeguard Carbon Price Simulator (ASCPS)")
 st.markdown("""
 This simulator forecasts carbon clearing prices ($P_{ACCU}$), physical abatement behavior, 
-and General Equilibrium capital flight dynamics resulting from Australia's **Safeguard Mechanism**.
+and capital flight dynamics resulting from Australia's **Safeguard Mechanism**.
 *Adjust the policy levers in the sidebar to stress-test the model.*
 """)
 
 # =====================================================================
 # 1. SIDEBAR CONFIGURATOR (THE POLICY DIALS)
 # =====================================================================
-st.sidebar.header("Policy & Market Controls")
+st.sidebar.header("🎛️ Policy & Market Controls")
 
 threshold = st.sidebar.slider(
     "1. Safeguard Threshold (tCO2-e)",
@@ -200,12 +200,15 @@ def run_solver(year, active_emissions, active_maccs, local_market, local_policy)
         else:
             return upper_bracket, "Saturated (Cap Hit)"
     except ValueError:
-        return upper_bracket, "Saturated (Cap Hit)"
+        if local_policy['remove_cap']:
+            return upper_bracket, "Extreme Scarcity (>$2k)"
+        else:
+            return cap, "Saturated (Cap Hit)"
 
 # =====================================================================
 # 3. BASELINE (2026) ANALYSIS DISPLAY
 # =====================================================================
-st.subheader("2026 Baseline Solve")
+st.subheader("📊 2026 Baseline Solve")
 
 # Sector baseline info cards
 base_maccs = {'MIN_C': 45.0, 'MAN_C': 35.0, 'ELC': 25.0}
@@ -238,7 +241,7 @@ for idx, sector in enumerate(['MIN_C', 'MAN_C']):
 # =====================================================================
 # 4. MULTI-PERIOD DYNAMIC SIMULATION (2026-2060)
 # =====================================================================
-st.subheader("Multi-Period Dynamic Forecast (2026 - 2060)")
+st.subheader("🔮 Multi-Period Dynamic Forecast (2026 - 2060)")
 
 sim_years = [2026, 2027, 2028, 2029, 2030, 2035, 2040, 2050, 2060]
 decline_rate = 0.049 * tightness
@@ -247,10 +250,16 @@ history = {'years': [], 'accu': [], 'min': [], 'man': [], 'elc': [], 'status': [
 for target_year in sim_years:
     years_elapsed = target_year - 2026
     
-    # Apply baseline reductions over time
+    # Post-2030 Statutory Glide Path integration (with tightness scaling)
     temp_emissions = {}
     for k, v in emissions_state.items():
-        shrunk_baseline = v['baseline'] * ((1 - decline_rate) ** years_elapsed)
+        if target_year <= 2030:
+            shrink_multiplier = (1 - decline_rate) ** years_elapsed
+        else:
+            post_2030_rate = 0.03285 * tightness
+            shrink_multiplier = ((1 - decline_rate) ** 4) * ((1 - post_2030_rate) ** (target_year - 2030))
+            
+        shrunk_baseline = v['baseline'] * shrink_multiplier
         temp_emissions[k] = {'e_actual': v['e_actual'], 'baseline': shrunk_baseline}
         
     # Hill Equation Cost decay trajectories (Wright's Law)
@@ -268,7 +277,7 @@ for target_year in sim_years:
     if not policy_state['remove_cap']:
         temp_market['cost_containment_cap'] = 82.68 * ((1 + 0.025) ** years_elapsed)
         
-    # Solve
+    # Solve Year-by-Year Markets
     p_eq, yr_status = run_solver(target_year, temp_emissions, temp_maccs, temp_market, policy_state)
     
     history['years'].append(target_year)
@@ -290,12 +299,3 @@ results_df = pd.DataFrame({
 
 st.markdown("**Simulation Output Ledger**")
 st.dataframe(results_df, use_container_width=True)
-
-# Note: All matplotlib visualization code and the 'Model Structural Mechanics' expander have been successfully removed as requested.
-```
-# eof
-
-### Summary of Changes:
-1. **Removed `matplotlib` Import:** Cleaned up the top of the file to prevent unnecessary library loads.
-2. **Simplified Layout:** Eliminated the columns split in Section 4; the simulation results table now elegantly spans the full container width for maximum readability.
-3. **Removed Mechanics Expander:** Completely excised the 2x2 structural mechanics charts from the bottom of the dashboard.
